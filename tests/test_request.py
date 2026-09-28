@@ -144,7 +144,7 @@ def test_same_source_replay_emits_extras_at_every_scope():
         content="answer",
         tool_calls=(call,),
         source=TARGET,
-        extra={"reasoning_content": "միտք"},
+        extra={"reasoning_content": "միտք", "empty_ext": ""},
     )
     assert encode(message) == {
         "model": "qwen",
@@ -161,6 +161,7 @@ def test_same_source_replay_emits_extras_at_every_scope():
                     }
                 ],
                 "reasoning_content": "միտք",
+                "empty_ext": "",
             }
         ],
         "stream": True,

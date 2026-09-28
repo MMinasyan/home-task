@@ -4,6 +4,8 @@ import ast
 import sys
 from pathlib import Path
 
+import pytest
+
 SRC = Path(__file__).resolve().parent.parent / "src"
 STDLIB = frozenset(sys.stdlib_module_names)
 
@@ -49,8 +51,12 @@ def test_model_module_imports_standard_library_only():
     assert outside == [], outside
 
 
-def test_cc_module_imports_standard_library_and_model_only():
-    modules = imported_modules(SRC / "agent_qa" / "providers" / "_cc.py")
+@pytest.mark.parametrize(
+    "relative",
+    ["agent_qa/providers/_cc.py", "agent_qa/providers/_sse.py"],
+)
+def test_provider_module_imports_standard_library_and_model_only(relative):
+    modules = imported_modules(SRC / relative)
     outside = sorted(m for m in modules if not (m.split(".")[0] in STDLIB or m == "agent_qa.model"))
     assert outside == [], outside
 
