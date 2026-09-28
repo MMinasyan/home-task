@@ -29,9 +29,9 @@ def imported_modules(path):
 
 
 def provider_module_allowed(module):
-    """Standard library, pydantic, or this package's own model/providers areas."""
+    """Standard library, pydantic, httpx, or this package's model/providers areas."""
     parts = module.split(".")
-    if parts[0] in STDLIB or parts[0] == "pydantic":
+    if parts[0] in STDLIB or parts[0] in ("pydantic", "httpx"):
         return True
     if parts[0] == "agent_qa":
         return parts[1:2] in (["model"], ["providers"], [])
@@ -65,3 +65,18 @@ def test_provider_modules_import_only_their_dependencies():
     for path in sorted((SRC / "agent_qa" / "providers").glob("*.py")):
         outside = sorted(m for m in imported_modules(path) if not provider_module_allowed(m))
         assert outside == [], f"{path.name}: {outside}"
+
+
+def test_client_module_imports_only_the_transport_dependencies():
+    modules = imported_modules(SRC / "agent_qa" / "providers" / "chat_completions.py")
+    allowed = frozenset(
+        {
+            "httpx",
+            "agent_qa.model",
+            "agent_qa.providers.config",
+            "agent_qa.providers._cc",
+            "agent_qa.providers._sse",
+        }
+    )
+    outside = sorted(m for m in modules if m.split(".")[0] not in STDLIB and m not in allowed)
+    assert outside == [], outside
