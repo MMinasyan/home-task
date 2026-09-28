@@ -49,6 +49,12 @@ def test_model_module_imports_standard_library_only():
     assert outside == [], outside
 
 
+def test_cc_module_imports_standard_library_and_model_only():
+    modules = imported_modules(SRC / "agent_qa" / "providers" / "_cc.py")
+    outside = sorted(m for m in modules if not (m.split(".")[0] in STDLIB or m == "agent_qa.model"))
+    assert outside == [], outside
+
+
 def test_provider_modules_import_only_their_dependencies():
     for path in sorted((SRC / "agent_qa" / "providers").glob("*.py")):
         outside = sorted(m for m in imported_modules(path) if not provider_module_allowed(m))
