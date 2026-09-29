@@ -1,0 +1,15 @@
+{
+  "providers": {
+    "local": {
+      "base_url": "http://127.0.0.1:8080/v1",
+      "api_key_env": "LOCAL_API_KEY",
+      "models": {
+        "qwen3.6-27b": {
+          "context_window": 32768,
+          "max_output_tokens": 8192,
+          "reasoning_field": "reasoning_content"
+        }
+      }
+    }
+  }
+}
