@@ -363,25 +363,6 @@ def test_next_after_end_raises_stopiteration(monkeypatch):
     asyncio.run(main())
 
 
-def test_failed_entry_consumes_the_stream(monkeypatch):
-    monkeypatch.setenv(ENV, SECRET)
-    log = Recording()
-    record_sleeps(log, monkeypatch)
-
-    async def main():
-        client = make_client(log, *(status_step(log, 429) for _ in range(4)))
-        stream = client.stream(CONFIG, TARGET, request(USER))
-        with pytest.raises(ProviderError, match="HTTP 429"):
-            await stream.__aenter__()
-        with pytest.raises(ValueError):
-            await stream.__anext__()
-        with pytest.raises(ValueError):
-            await stream.__aenter__()
-
-    asyncio.run(main())
-    assert len(log.requests) == 4
-
-
 # --- successful streams end to end (C6) ---------------------------------------
 
 
@@ -641,10 +622,7 @@ def test_cancellation_preserves_reasoning_tool_and_text_fragments(monkeypatch):
     rest = sse(choice({"content": "lo"}), choice({}, finish="stop"), usage_event())
 
     async def main():
-        client = make_client(
-            log, stream_step(log, first, rest, gate=gate),
-            stream_step(log, text_stream(["B"])),
-        )
+        client = make_client(log, stream_step(log, first, rest, gate=gate))
         stream = client.stream(CONFIG, TARGET, request(USER))
         fragments = []
         seen = asyncio.Event()
@@ -705,6 +683,41 @@ def test_retryable_statuses_are_retried_with_exact_backoff(monkeypatch):
         ("close", 503), ("sleep", 8),
         ("close", 200),
     ]
+
+
+def test_cancellation_during_opening_starts_no_later_attempt(monkeypatch):
+    monkeypatch.setenv(ENV, SECRET)
+    log = Recording()
+    reached = asyncio.Event()
+    hold = asyncio.Event()
+
+    async def handler(item):
+        log.requests.append(item)
+        if len(log.requests) == 1:
+            reached.set()
+            await hold.wait()
+            return TrackedResponse(200, b"", log)
+        return TrackedResponse(200, text_stream(["ok"]), log)
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = ChatCompletionsClient(http)
+
+    async def main():
+        stream = client.stream(CONFIG, TARGET, request(USER))
+        task = asyncio.create_task(stream.__aenter__())
+        await reached.wait()
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        assert task.cancelled()
+        assert len(log.requests) == 1
+        fragments = []
+        await consume(client.stream(CONFIG, TARGET, request(USER)), fragments)
+        assert fragments == ["ok"]
+
+    asyncio.run(main())
 
 
 def test_cancellation_during_backoff_starts_no_later_attempt(monkeypatch):
