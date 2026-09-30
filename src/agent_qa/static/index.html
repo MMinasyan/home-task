@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Q&amp;A</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <h1>Agent Q&amp;A</h1>
+    <section id="conversation" aria-label="Conversation"></section>
+    <p id="status" role="status" aria-live="polite" aria-label="Conversation status"></p>
+    <form id="composer">
+      <label for="question">Question</label>
+      <textarea id="question" rows="3"></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,10 +1,13 @@
 """HTTP session, admission, event-stream, and shutdown contracts for the app."""
 
+import argparse
 import asyncio
 import contextlib
+import importlib.resources
 import json
 import sqlite3
 import threading
+from pathlib import Path
 
 import httpx
 import pytest
@@ -1376,3 +1379,91 @@ def test_unwritable_db_lifespan_fails_without_chaining(tmp_path):
         assert caught.value.__cause__ is None
 
     asyncio.run(run())
+
+
+# --- P8 static mount ----------------------------------------------------------------
+
+
+def test_static_pages_serve_from_a_changed_cwd(tmp_path, monkeypatch):
+    async def run():
+        app = build_app(tmp_path / "db.sqlite3", make_client(Recorder()))
+        # A cwd-relative asset resolution would break under a foreign cwd.
+        monkeypatch.chdir(tmp_path)
+        async with app.router.lifespan_context(app):
+            async with asgi_client(app) as client:
+                page = await client.get("/")
+                assert page.status_code == 200
+                assert page.headers["content-type"].startswith("text/html")
+                script = await client.get("/app.js")
+                assert script.status_code == 200
+                assert "javascript" in script.headers["content-type"]
+                styles = await client.get("/style.css")
+                assert styles.status_code == 200
+                assert styles.headers["content-type"].startswith("text/css")
+                static = importlib.resources.files("agent_qa") / "static"
+                assert page.text == (static / "index.html").read_text(encoding="utf-8")
+                assert script.text == (static / "app.js").read_text(encoding="utf-8")
+                assert styles.text == (static / "style.css").read_text(encoding="utf-8")
+                assert (await client.get("/api/nothing")).status_code == 404
+                session = await client.get("/api/session")
+                assert session.status_code == 200
+
+    asyncio.run(run())
+
+
+# --- Manual P9 fixture launcher (never started by pytest) ---------------------------
+
+
+def manual_ui():
+    """Serve the production app with a canned 20-fragment provider stream."""
+    parser = argparse.ArgumentParser(prog="tests/test_app.py")
+    parser.add_argument("--manual-ui", action="store_true", required=True)
+    parser.add_argument("--db", required=True)
+    arguments = parser.parse_args()
+
+    calls = 0
+
+    async def stream():
+        for index in range(20):
+            delta = {"content": f" fragment-{index}"}
+            if index == 0:
+                delta["role"] = "assistant"
+            frame = json.dumps({"choices": [{"index": 0, "delta": delta}]}).encode()
+            yield b"data: " + frame + b"\n\n"
+            await asyncio.sleep(0.2)
+        yield sse(choice({}, finish="stop"), usage_event())
+
+    def handler(request):
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, content=stream()
+        )
+
+    config = ProvidersConfig.model_validate(
+        {
+            "providers": {
+                "local": {
+                    "base_url": "http://fixture.invalid/v1",
+                    "models": {"fixture": {"context_window": 8}},
+                }
+            }
+        }
+    )
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    app = create_app(
+        config,
+        ModelRef(provider="local", model="fixture"),
+        Path(arguments.db),
+        "You are answering questions for a manual browser check.",
+        http=http,
+    )
+    try:
+        uvicorn.run(app, host="127.0.0.1", port=8000, timeout_graceful_shutdown=0)
+    finally:
+        asyncio.run(http.aclose())
+    print(f"model calls: {calls}")
+
+
+if __name__ == "__main__":
+    manual_ui()

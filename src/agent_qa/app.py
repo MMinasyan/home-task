@@ -1,6 +1,7 @@
 """HTTP session, admission, and streamed event endpoints over shared services."""
 
 import asyncio
+import importlib.resources
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,7 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
-from starlette.routing import Route
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
 
 from agent_qa.model import ModelRef
 from agent_qa.providers.chat_completions import ChatCompletionsClient
@@ -195,5 +197,15 @@ def create_app(
             Route("/api/session", _session, methods=["GET"]),
             Route("/api/message", _message, methods=["POST"]),
             Route("/api/events", _events, methods=["GET"]),
+            # The static client mounts after the API routes, resolved from the
+            # installed package rather than the process working directory.
+            Mount(
+                "/",
+                StaticFiles(
+                    directory=str(importlib.resources.files("agent_qa") / "static"),
+                    html=True,
+                ),
+                name="static",
+            ),
         ],
     )
