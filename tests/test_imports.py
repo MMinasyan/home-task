@@ -86,3 +86,17 @@ def test_client_module_imports_only_the_transport_dependencies():
     )
     outside = sorted(m for m in modules if m.split(".")[0] not in STDLIB and m not in allowed)
     assert outside == [], outside
+
+
+def test_turns_module_imports_only_the_storage_model_and_provider_dependencies():
+    modules = imported_modules(SRC / "agent_qa" / "turns.py")
+    allowed = frozenset(
+        {
+            "agent_qa.model",
+            "agent_qa.storage",
+            "agent_qa.providers.chat_completions",
+            "agent_qa.providers.config",
+        }
+    )
+    outside = sorted(m for m in modules if m.split(".")[0] not in STDLIB and m not in allowed)
+    assert outside == [], outside
