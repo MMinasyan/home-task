@@ -9,3 +9,7 @@ dist/
 *.egg-info/
 .env
 .env.*
+agent_qa.sqlite3
+agent_qa.sqlite3-journal
+agent_qa.sqlite3-shm
+agent_qa.sqlite3-wal

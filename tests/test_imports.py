@@ -100,3 +100,32 @@ def test_turns_module_imports_only_the_storage_model_and_provider_dependencies()
     )
     outside = sorted(m for m in modules if m.split(".")[0] not in STDLIB and m not in allowed)
     assert outside == [], outside
+
+
+def test_app_module_imports_only_the_composition_dependencies():
+    modules = imported_modules(SRC / "agent_qa" / "app.py")
+    allowed = frozenset(
+        {
+            "agent_qa.model",
+            "agent_qa.storage",
+            "agent_qa.turns",
+            "agent_qa.providers.chat_completions",
+            "agent_qa.providers.config",
+        }
+    )
+    outside = sorted(
+        m for m in modules
+        if m.split(".")[0] not in STDLIB
+        and m.split(".")[0] not in ("httpx", "pydantic", "starlette")
+        and m not in allowed
+    )
+    assert outside == [], outside
+
+
+def test_launcher_module_imports_only_the_launcher_dependencies():
+    modules = imported_modules(SRC / "agent_qa" / "__main__.py")
+    allowed = frozenset(
+        {"uvicorn", "agent_qa.app", "agent_qa.model", "agent_qa.providers.config"}
+    )
+    outside = sorted(m for m in modules if m.split(".")[0] not in STDLIB and m not in allowed)
+    assert outside == [], outside
