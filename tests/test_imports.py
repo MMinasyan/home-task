@@ -51,6 +51,12 @@ def test_model_module_imports_standard_library_only():
     assert outside == [], outside
 
 
+def test_storage_module_imports_standard_library_only():
+    modules = imported_modules(SRC / "agent_qa" / "storage.py")
+    outside = sorted(m for m in modules if m.split(".")[0] not in STDLIB)
+    assert outside == [], outside
+
+
 @pytest.mark.parametrize(
     "relative",
     ["agent_qa/providers/_cc.py", "agent_qa/providers/_sse.py"],
